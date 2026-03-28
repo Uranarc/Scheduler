@@ -1,0 +1,2 @@
+"""Media Scheduler application package."""
+
