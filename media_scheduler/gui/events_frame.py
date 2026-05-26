@@ -8,6 +8,7 @@ from media_scheduler.db.events import (
     add_event_db,
     delete_all_events_db,
     delete_event_db,
+    delete_events_for_month,
     generate_fixed_events_for_month,
     list_events_db,
 )
@@ -39,6 +40,7 @@ class EventsFrame(tk.Frame):
 
         ttk.Button(frm, text='Add event', command=self.add_event).grid(row=0, column=7, padx=6)
         ttk.Button(frm, text='Generate fixed events for month', command=self.generate_fixed_events_dialog).grid(row=0, column=8, padx=6)
+        ttk.Button(frm, text='Delete events for month', command=self.delete_events_month_dialog).grid(row=0, column=9, padx=6)
 
         self.tree = ttk.Treeview(self, columns=('id', 'name', 'date', 'importance'), show='headings')
         for h, w in [('id', 40), ('name', 420), ('date', 120), ('importance', 80)]:
@@ -94,7 +96,7 @@ class EventsFrame(tk.Frame):
             return
         vals = self.tree.item(sel[0])['values']
         if messagebox.askyesno('Confirm', f'Delete event {vals[1]} on {vals[2]}?'):
-            delete_event_db(vals[0])
+            delete_event_db(int(vals[0]))
             self.refresh()
 
     def delete_all(self):
@@ -114,5 +116,21 @@ class EventsFrame(tk.Frame):
         created = generate_fixed_events_for_month(y, m)
         self.refresh()
         messagebox.showinfo('Done', f'Created {len(created)} fixed events for {m}/{y} (skipped existing dates).')
+
+    def delete_events_month_dialog(self):
+        today = date.today()
+        m = simpledialog.askinteger('Month', 'Month (1-12):', initialvalue=today.month, minvalue=1, maxvalue=12)
+        if m is None:
+            return
+        y = simpledialog.askinteger('Year', 'Year (e.g. 2026):', initialvalue=today.year, minvalue=1900, maxvalue=3000)
+        if y is None:
+            return
+
+        if not messagebox.askyesno('Confirm', f'Delete all events for {m}/{y}? This also removes related assignments and coordinators.'):
+            return
+
+        deleted = delete_events_for_month(y, m)
+        self.refresh()
+        messagebox.showinfo('Done', f'Deleted {deleted} events for {m}/{y}.')
 
 

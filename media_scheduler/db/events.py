@@ -35,6 +35,21 @@ def delete_all_events_db():
         conn.commit()
 
 
+def delete_events_for_month(year: int, month: int):
+    start = date(int(year), int(month), 1).isoformat()
+    if int(month) == 12:
+        end = date(int(year) + 1, 1, 1).isoformat()
+    else:
+        end = date(int(year), int(month) + 1, 1).isoformat()
+
+    with get_conn() as conn:
+        c = conn.cursor()
+        c.execute('DELETE FROM events WHERE date >= ? AND date < ?', (start, end))
+        deleted = c.rowcount
+        conn.commit()
+    return deleted
+
+
 def generate_fixed_events_for_month(year: int, month: int):
     """
     Regras:
