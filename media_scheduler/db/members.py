@@ -1,5 +1,6 @@
 """Repository functions for members and member blackout dates."""
 
+from media_scheduler.config import LOAD_CAP, ZONE_WEIGHTS
 from media_scheduler.db.connection import get_conn
 
 
@@ -94,3 +95,27 @@ def set_member_availability(member_id: int, availability_csv: str):
         conn.commit()
 
 
+def recalculate_member_load_stress(member_id: int, stress_increase: float = 1.0):
+    """
+    Recalculate member's load_stress based on current assignments.
+    Used after manual assignment edits to reflect actual workload.
+    """
+    with get_conn() as conn:
+        rows = conn.execute('''
+            SELECT a.zone AS zone, e.importance AS importance
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+            WHERE a.member_id = ?
+        ''', (member_id,)).fetchall()
+
+        new_load = 0.0
+        for r in rows:
+            zone = r['zone']
+            importance = r['importance']
+            zw = float(ZONE_WEIGHTS.get(zone, 1.0))
+            load_inc = float(stress_increase) * (1 + 0.3 * (importance - 1)) * (1 + 0.2 * (zw - 1))
+            new_load += load_inc
+
+        new_load = min(float(LOAD_CAP), new_load)
+        conn.execute('UPDATE members SET load_stress = ? WHERE id = ?', (new_load, member_id))
+        conn.commit()

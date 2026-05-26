@@ -3,14 +3,15 @@
 from datetime import UTC, datetime
 
 from media_scheduler.db.connection import get_conn
+from media_scheduler.db.members import recalculate_member_load_stress
 
 
 def list_assignments_db(start: str = None, end: str = None):
     q = '''SELECT a.id as aid, e.date as evdate, e.name as evname, a.zone as zone,
-                  a.member_id as mid, m.name as mname
-           FROM assignments a
-           JOIN events e ON a.event_id = e.id
-           JOIN members m ON a.member_id = m.id'''
+                   a.member_id as mid, m.name as mname
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+            JOIN members m ON a.member_id = m.id'''
     params = ()
     if start and end:
         q += ' WHERE e.date BETWEEN ? AND ?'
@@ -22,8 +23,18 @@ def list_assignments_db(start: str = None, end: str = None):
 
 def update_assignment_member(assignment_id: int, member_id: int):
     with get_conn() as conn:
+        # Get old member id first
+        old_mid = conn.execute('SELECT member_id FROM assignments WHERE id = ?', (assignment_id,)).fetchone()
+        if old_mid:
+            old_mid = old_mid['member_id']
+
         conn.execute('UPDATE assignments SET member_id = ? WHERE id = ?', (member_id, assignment_id))
         conn.commit()
+
+    # Recalculate both old and new member's loads
+    if old_mid and old_mid != member_id:
+        recalculate_member_load_stress(old_mid)
+    recalculate_member_load_stress(member_id)
 
 
 def add_assignment_manual(event_id: int, zone: str, member_id: int):
@@ -36,6 +47,8 @@ def add_assignment_manual(event_id: int, zone: str, member_id: int):
                 assigned_at = excluded.assigned_at
         ''', (event_id, zone, member_id, datetime.now(UTC).isoformat()))
         conn.commit()
+
+    recalculate_member_load_stress(member_id)
 
 
 def get_load_summary(year: int, month: int) -> list[dict]:
@@ -96,23 +109,48 @@ def get_load_summary(year: int, month: int) -> list[dict]:
 
 def delete_assignment_db(assignment_id: int):
     with get_conn() as conn:
+        # Get member id before deletion
+        row = conn.execute('SELECT member_id FROM assignments WHERE id = ?', (assignment_id,)).fetchone()
+        member_id = int(row['member_id']) if row else None
+
         conn.execute('DELETE FROM assignments WHERE id = ?', (assignment_id,))
         conn.commit()
+
+    if member_id is not None:
+        recalculate_member_load_stress(member_id)
 
 
 def delete_all_assignments_db():
     with get_conn() as conn:
+        # Get all member ids
+        member_ids = conn.execute('SELECT DISTINCT member_id FROM assignments').fetchall()
         conn.execute('DELETE FROM assignments')
         conn.commit()
+
+    # Recalculate all members
+    for r in member_ids:
+        recalculate_member_load_stress(r['member_id'])
 
 
 def delete_assignments_in_range(start: str, end: str):
     with get_conn() as conn:
+        # Get all member ids affected
+        member_ids = conn.execute('''
+            SELECT DISTINCT a.member_id
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+            WHERE e.date BETWEEN ? AND ?
+        ''', (start, end)).fetchall()
+
         conn.execute('''
             DELETE FROM assignments
             WHERE event_id IN (SELECT id FROM events WHERE date BETWEEN ? AND ?)
         ''', (start, end))
         conn.commit()
+
+    # Recalculate affected members
+    for r in member_ids:
+        recalculate_member_load_stress(r['member_id'])
 
 
 def delete_coordinators_in_range(start: str, end: str):
