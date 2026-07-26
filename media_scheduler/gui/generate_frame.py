@@ -11,6 +11,7 @@ from media_scheduler.db.assignments import (
 )
 from media_scheduler.db.members import list_members_db
 from media_scheduler.export import export_assignments_csv
+from media_scheduler.gui import theme
 from media_scheduler.gui.date_picker import pick_date_dialog
 from media_scheduler.scheduler.algorithm import generate_schedule_db
 from media_scheduler.utils.formatting import format_month_message
@@ -26,75 +27,118 @@ class GenerateFrame(tk.Frame):
         self._build()
 
     def _build(self):
-        frm = ttk.Frame(self)
-        frm.pack(fill='x', padx=10, pady=8)
+        self.configure(bg=theme.current_colors()['bg'])
 
-        ttk.Label(frm, text='Start yyyy-mm-dd').grid(row=0, column=0)
-        self.start_e = ttk.Entry(frm, width=12)
-        self.start_e.grid(row=0, column=1)
-        ttk.Button(frm, text='Pick', command=self.pick_start_date).grid(row=0, column=2, padx=(4, 8))
+        params = ttk.LabelFrame(self, text='Período e parâmetros', padding=(12, 10))
+        params.pack(fill='x', padx=12, pady=(12, 8))
 
-        ttk.Label(frm, text='End yyyy-mm-dd').grid(row=0, column=3)
-        self.end_e = ttk.Entry(frm, width=12)
-        self.end_e.grid(row=0, column=4)
-        ttk.Button(frm, text='Pick', command=self.pick_end_date).grid(row=0, column=5, padx=(4, 8))
+        ttk.Label(params, text='Início yyyy-mm-dd').grid(row=0, column=0, sticky='w')
+        self.start_e = ttk.Entry(params, width=12)
+        self.start_e.grid(row=0, column=1, padx=(6, 4))
+        ttk.Button(params, text='📅', width=3, command=self.pick_start_date).grid(row=0, column=2, padx=(0, 16))
 
-        ttk.Label(frm, text='Cansaço por culto (0–2)').grid(row=0, column=6)
-        self.si_e = ttk.Entry(frm, width=5)
+        ttk.Label(params, text='Fim yyyy-mm-dd').grid(row=0, column=3, sticky='w')
+        self.end_e = ttk.Entry(params, width=12)
+        self.end_e.grid(row=0, column=4, padx=(6, 4))
+        ttk.Button(params, text='📅', width=3, command=self.pick_end_date).grid(row=0, column=5, padx=(0, 16))
+
+        ttk.Button(params, text='▶ Generate schedule', style='Accent.TButton', command=self.generate).grid(
+            row=0, column=6, padx=(0, 8)
+        )
+        ttk.Button(params, text='⬇ Export CSV', command=self.export_csv).grid(row=0, column=7)
+
+        ttk.Separator(params).grid(row=1, column=0, columnspan=8, sticky='ew', pady=8)
+
+        ttk.Label(params, text='Cansaço por culto (0–2)').grid(row=2, column=0, sticky='w')
+        self.si_e = ttk.Entry(params, width=5)
         self.si_e.insert(0, '1')
-        self.si_e.grid(row=0, column=7)
+        self.si_e.grid(row=2, column=1, sticky='w', padx=(6, 16))
 
-        ttk.Label(frm, text='Priorizar descanso (0-3)').grid(row=0, column=8)
-        self.sw_e = ttk.Entry(frm, width=5)
+        ttk.Label(params, text='Priorizar descanso (0-3)').grid(row=2, column=2, sticky='w')
+        self.sw_e = ttk.Entry(params, width=5)
         self.sw_e.insert(0, '1')
-        self.sw_e.grid(row=0, column=9)
+        self.sw_e.grid(row=2, column=3, sticky='w', padx=(6, 16))
 
-        ttk.Label(frm, text='Evitar repetição (0-1)').grid(row=0, column=10)
-        self.rw_e = ttk.Entry(frm, width=5)
+        ttk.Label(params, text='Evitar repetição (0-1)').grid(row=2, column=4, sticky='w')
+        self.rw_e = ttk.Entry(params, width=5)
         self.rw_e.insert(0, '0.3')
-        self.rw_e.grid(row=0, column=11)
+        self.rw_e.grid(row=2, column=5, sticky='w', padx=(6, 16))
 
-        ttk.Label(frm, text='Descanso mínimo (dias)').grid(row=1, column=0)
-        self.cd_e = ttk.Entry(frm, width=5)
+        ttk.Label(params, text='Descanso mínimo (dias)').grid(row=2, column=6, sticky='w')
+        self.cd_e = ttk.Entry(params, width=5)
         self.cd_e.insert(0, '0')
-        self.cd_e.grid(row=1, column=1)
-
-        ttk.Button(frm, text='Generate schedule', command=self.generate).grid(row=1, column=3, padx=6)
-        ttk.Button(frm, text='Export CSV', command=self.export_csv).grid(row=1, column=4, padx=6)
+        self.cd_e.grid(row=2, column=7, sticky='w', padx=(6, 0))
 
         # --- editable assignment table (source of truth; the message below is
         # just a preview rendered FROM this data, never edited directly) ---
-        ttk.Label(self, text='Assignments (double-click, or select + Edit, to change a member)').pack(
-            anchor='w', padx=10, pady=(8, 0)
-        )
+        table_section = ttk.Frame(self)
+        table_section.pack(fill='both', expand=True, padx=12, pady=(0, 4))
 
-        table_frm = ttk.Frame(self)
-        table_frm.pack(fill='both', expand=False, padx=10, pady=(2, 4))
+        header_row = ttk.Frame(table_section)
+        header_row.pack(fill='x')
+        ttk.Label(header_row, text='Assignments', style='Heading.TLabel').pack(side='left')
+        ttk.Label(header_row, text='  (duplo clique, ou seleciona + Editar, para trocar de membro)',
+                  style='Muted.TLabel').pack(side='left')
+
+        table_frm = ttk.Frame(table_section)
+        table_frm.pack(fill='both', expand=True, pady=(4, 4))
+        table_frm.rowconfigure(0, weight=1)
+        table_frm.columnconfigure(0, weight=1)
 
         self.tree = ttk.Treeview(
             table_frm, columns=('aid', 'date', 'event', 'zone', 'member'), show='headings', height=10
         )
-        for h, w in [('aid', 0), ('date', 100), ('event', 320), ('zone', 70), ('member', 160)]:
-            self.tree.heading(h, text=h if h != 'aid' else '')
+        for h, label, w in [
+            ('aid', '', 0), ('date', 'Data', 100), ('event', 'Evento', 320),
+            ('zone', 'Zona', 70), ('member', 'Membro', 160),
+        ]:
+            self.tree.heading(h, text=label)
             self.tree.column(h, width=w, stretch=(h != 'aid'))
         self.tree.column('aid', width=0, stretch=False)  # keep assignment id out of view, but addressable
-        self.tree.pack(side='left', fill='both', expand=True)
+        self.tree.grid(row=0, column=0, sticky='nsew')
         sb = ttk.Scrollbar(table_frm, orient='vertical', command=self.tree.yview)
-        sb.pack(side='right', fill='y')
+        sb.grid(row=0, column=1, sticky='ns')
         self.tree.configure(yscroll=sb.set)
         self.tree.bind('<Double-1>', lambda _e: self.edit_selected_assignment())
 
-        tbtns = ttk.Frame(self)
-        tbtns.pack(fill='x', padx=10)
-        ttk.Button(tbtns, text='Edit selected', command=self.edit_selected_assignment).pack(side='left', padx=4)
+        tbtns = ttk.Frame(table_section)
+        tbtns.pack(fill='x', pady=(2, 0))
+        ttk.Button(tbtns, text='✎ Editar selecionado', command=self.edit_selected_assignment).pack(side='left')
 
         # --- read-only preview of the message that would be sent ---
-        ttk.Label(self, text='Message preview (auto-updates after edits above — not directly editable)').pack(
-            anchor='w', padx=10, pady=(8, 0)
+        preview_section = ttk.Frame(self)
+        preview_section.pack(fill='both', expand=True, padx=12, pady=(4, 12))
+
+        preview_header = ttk.Frame(preview_section)
+        preview_header.pack(fill='x')
+        ttk.Label(preview_header, text='Message preview', style='Heading.TLabel').pack(side='left')
+        ttk.Label(preview_header, text='  (auto-atualiza após edições acima — não editável diretamente)',
+                  style='Muted.TLabel').pack(side='left')
+
+        text_wrap = ttk.Frame(preview_section, style='Surface.TFrame')
+        text_wrap.pack(fill='both', expand=True, pady=(4, 0))
+
+        c = theme.current_colors()
+        f = theme.fonts()
+        self.output = tk.Text(
+            text_wrap, height=16, wrap='word', relief='flat', borderwidth=0,
+            bg=c['surface'], fg=c['fg'], insertbackground=c['fg'],
+            selectbackground=c['select_bg'], selectforeground=c['fg'],
+            font=f['mono'], padx=10, pady=8,
         )
-        self.output = tk.Text(self, height=16)
-        self.output.pack(fill='both', expand=True, padx=10, pady=(2, 8))
-        self.output.configure(state='disabled')
+        self.output.pack(side='left', fill='both', expand=True)
+        out_sb = ttk.Scrollbar(text_wrap, orient='vertical', command=self.output.yview)
+        out_sb.pack(side='right', fill='y')
+        self.output.configure(yscrollcommand=out_sb.set, state='disabled')
+
+    def refresh_theme(self):
+        self.configure(bg=theme.current_colors()['bg'])
+        theme.configure_zebra(self.tree)
+        c = theme.current_colors()
+        self.output.configure(
+            bg=c['surface'], fg=c['fg'], insertbackground=c['fg'],
+            selectbackground=c['select_bg'], selectforeground=c['fg'],
+        )
 
     def pick_start_date(self):
         chosen = pick_date_dialog(self, self.start_e.get().strip(), title='Select start date')
@@ -167,9 +211,13 @@ class GenerateFrame(tk.Frame):
         for i in self.tree.get_children():
             self.tree.delete(i)
 
+        theme.configure_zebra(self.tree)
         db_rows = self._current_rows()
-        for r in db_rows:
-            self.tree.insert('', 'end', values=(r['aid'], r['evdate'], r['evname'], r['zone'], r['mname']))
+        for idx, r in enumerate(db_rows):
+            self.tree.insert(
+                '', 'end', values=(r['aid'], r['evdate'], r['evname'], r['zone'], r['mname']),
+                tags=(theme.row_tag(idx),)
+            )
 
         rows = [(r['evid'], r['evdate'], r['evname'], r['zone'], r['mid'], r['mname']) for r in db_rows]
 
@@ -218,6 +266,7 @@ class GenerateFrame(tk.Frame):
 
         dlg = tk.Toplevel(self)
         dlg.title('Edit assignment')
+        dlg.configure(bg=theme.current_colors()['bg'])
         dlg.transient(self)
         dlg.grab_set()
         dlg.resizable(False, False)
@@ -226,7 +275,9 @@ class GenerateFrame(tk.Frame):
         body.pack(fill='both', expand=True, padx=12, pady=12)
 
         ttk.Label(body, text=f'{ev_date} | {ev_name}').grid(row=0, column=0, columnspan=2, sticky='w')
-        ttk.Label(body, text=f'Zone: {zone}').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 8))
+        ttk.Label(body, text=f'Zone: {zone}', style='Muted.TLabel').grid(
+            row=1, column=0, columnspan=2, sticky='w', pady=(0, 8)
+        )
 
         members = list_members_db()
         member_items = [m['name'] for m in members]
@@ -253,7 +304,7 @@ class GenerateFrame(tk.Frame):
             self._refresh_table_and_preview()
 
         ttk.Button(btns, text='Cancel', command=dlg.destroy).pack(side='right', padx=(8, 0))
-        ttk.Button(btns, text='Confirm', command=on_confirm).pack(side='right')
+        ttk.Button(btns, text='Confirm', style='Accent.TButton', command=on_confirm).pack(side='right')
 
         dlg.wait_window()
 

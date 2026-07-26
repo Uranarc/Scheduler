@@ -5,6 +5,7 @@ from datetime import date, datetime
 import tkinter as tk
 from tkinter import ttk
 
+from media_scheduler.gui import theme
 from media_scheduler.utils.helpers import _next_month_reference_date
 
 
@@ -12,6 +13,7 @@ class DatePickerDialog(tk.Toplevel):
     def __init__(self, parent, initial_date: date | None = None, title: str = "Select date"):
         super().__init__(parent)
         self.title(title)
+        self.configure(bg=theme.current_colors()['bg'])
         self.resizable(False, False)
         self.transient(parent)
         self.grab_set()
@@ -21,25 +23,25 @@ class DatePickerDialog(tk.Toplevel):
         self.year_var = tk.IntVar(value=initial.year)
         self.month_var = tk.IntVar(value=initial.month)
 
-        top = ttk.Frame(self)
-        top.pack(fill='x', padx=8, pady=8)
+        top = ttk.Frame(self, padding=(10, 10, 10, 4))
+        top.pack(fill='x')
 
         years = [str(y) for y in range(initial.year - 10, initial.year + 11)]
         ttk.Label(top, text='Year').pack(side='left')
         self.year_cb = ttk.Combobox(top, width=6, state='readonly', values=years, textvariable=self.year_var)
-        self.year_cb.pack(side='left', padx=(4, 10))
+        self.year_cb.pack(side='left', padx=(4, 12))
 
         ttk.Label(top, text='Month').pack(side='left')
         months = [str(m) for m in range(1, 13)]
         self.month_cb = ttk.Combobox(top, width=4, state='readonly', values=months, textvariable=self.month_var)
         self.month_cb.pack(side='left', padx=4)
 
-        self.days_frame = ttk.Frame(self)
-        self.days_frame.pack(padx=8, pady=(0, 8))
+        self.days_frame = ttk.Frame(self, padding=(10, 4, 10, 6))
+        self.days_frame.pack()
 
-        bottom = ttk.Frame(self)
-        bottom.pack(fill='x', padx=8, pady=(0, 8))
-        ttk.Button(bottom, text='Today', command=self._set_today).pack(side='left')
+        bottom = ttk.Frame(self, padding=(10, 0, 10, 10))
+        bottom.pack(fill='x')
+        ttk.Button(bottom, text='● Hoje', style='Accent.TButton', command=self._set_today).pack(side='left')
         ttk.Button(bottom, text='Cancel', command=self._cancel).pack(side='right')
 
         self.year_cb.bind('<<ComboboxSelected>>', lambda _e: self._render_days())
@@ -55,19 +57,25 @@ class DatePickerDialog(tk.Toplevel):
             w.destroy()
 
         for i, wd in enumerate(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']):
-            ttk.Label(self.days_frame, text=wd, width=4, anchor='center').grid(row=0, column=i, padx=1, pady=1)
+            style = 'Muted.TLabel'
+            ttk.Label(self.days_frame, text=wd, width=4, anchor='center', style=style).grid(
+                row=0, column=i, padx=1, pady=(0, 4)
+            )
 
         y = int(self.year_var.get())
         m = int(self.month_var.get())
         first_wd, ndays = calendar.monthrange(y, m)
+        today = date.today()
 
         row = 1
         col = first_wd
         for d in range(1, ndays + 1):
+            is_today = (y == today.year and m == today.month and d == today.day)
             ttk.Button(
                 self.days_frame,
                 text=str(d),
                 width=4,
+                style='Accent.TButton' if is_today else 'TButton',
                 command=lambda day=d: self._pick(day)
             ).grid(row=row, column=col, padx=1, pady=1)
             col += 1
@@ -100,4 +108,3 @@ def pick_date_dialog(parent, current_iso: str = '', title: str = 'Select date') 
     dlg = DatePickerDialog(parent, initial_date=initial, title=title)
     parent.wait_window(dlg)
     return dlg.result
-

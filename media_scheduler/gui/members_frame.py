@@ -18,6 +18,7 @@ from media_scheduler.db.members import (
     set_member_stress,
     update_member_level,
 )
+from media_scheduler.gui import theme
 from media_scheduler.utils.helpers import _clamp, _safe_int
 
 
@@ -27,75 +28,88 @@ class MembersFrame(tk.Frame):
         self._build()
 
     def _build(self):
-        frm = ttk.Frame(self)
-        frm.pack(fill='x', padx=10, pady=8)
+        self.configure(bg=theme.current_colors()['bg'])
 
-        ttk.Label(frm, text='Name').grid(row=0, column=0)
-        self.name_e = ttk.Entry(frm, width=18)
-        self.name_e.grid(row=0, column=1)
+        form = ttk.LabelFrame(self, text='Adicionar membro', padding=(12, 10))
+        form.pack(fill='x', padx=12, pady=(12, 8))
 
-        ttk.Label(frm, text='Live (0–10)').grid(row=0, column=2)
-        self.live_e = ttk.Entry(frm, width=5)
-        self.live_e.grid(row=0, column=3)
+        ttk.Label(form, text='Nome').grid(row=0, column=0, sticky='w')
+        self.name_e = ttk.Entry(form, width=20)
+        self.name_e.grid(row=0, column=1, padx=(6, 16))
 
-        ttk.Label(frm, text='Luzes (0–10)').grid(row=0, column=4)
-        self.luzes_e = ttk.Entry(frm, width=5)
-        self.luzes_e.grid(row=0, column=5)
+        for i, (label, attr) in enumerate([
+            ('Live (0–10)', 'live_e'), ('Luzes (0–10)', 'luzes_e'),
+            ('Slide (0–10)', 'slide_e'), ('Coord (0–10)', 'coord_e'),
+        ]):
+            col = 2 + i * 2
+            ttk.Label(form, text=label).grid(row=0, column=col, sticky='w')
+            entry = ttk.Entry(form, width=5)
+            entry.grid(row=0, column=col + 1, padx=(6, 16))
+            setattr(self, attr, entry)
 
-        ttk.Label(frm, text='Slide (0–10)').grid(row=0, column=6)
-        self.slide_e = ttk.Entry(frm, width=5)
-        self.slide_e.grid(row=0, column=7)
+        ttk.Button(form, text='＋ Add member', style='Accent.TButton', command=self.add_member).grid(
+            row=0, column=10, padx=(4, 0)
+        )
 
-        ttk.Label(frm, text='Coord (0–10)').grid(row=0, column=8)
-        self.coord_e = ttk.Entry(frm, width=5)
-        self.coord_e.grid(row=0, column=9)
-
-        ttk.Button(frm, text='Add member', command=self.add_member).grid(row=0, column=10, padx=6)
-
-        midfrm = ttk.Frame(self)
-        midfrm.pack(fill='both', expand=True, padx=10, pady=8)
+        table_wrap = ttk.Frame(self)
+        table_wrap.pack(fill='both', expand=True, padx=12, pady=4)
+        table_wrap.rowconfigure(0, weight=1)
+        table_wrap.columnconfigure(0, weight=1)
 
         self.tree = ttk.Treeview(
-            midfrm,
+            table_wrap,
             columns=('id', 'name', 'live', 'luzes', 'slide', 'coord', 'stress', 'load', 'maxdays', 'avail'),
             show='headings'
         )
         colspec = [
-            ('id', 40),
-            ('name', 160),
-            ('live', 55),
-            ('luzes', 60),
-            ('slide', 60),
-            ('coord', 60),
-            ('stress', 70),
-            ('load', 70),
-            ('maxdays', 80),
-            ('avail', 200),
+            ('id', 'ID', 40, 'center'),
+            ('name', 'Nome', 160, 'w'),
+            ('live', 'Live', 55, 'center'),
+            ('luzes', 'Luzes', 60, 'center'),
+            ('slide', 'Slide', 60, 'center'),
+            ('coord', 'Coord', 60, 'center'),
+            ('stress', 'Stress', 70, 'center'),
+            ('load', 'Load', 70, 'center'),
+            ('maxdays', 'Max dias', 80, 'center'),
+            ('avail', 'Disponibilidade', 220, 'w'),
         ]
-        for h, w in colspec:
-            self.tree.heading(h, text=h)
-            self.tree.column(h, width=w)
+        for key, label, w, anchor in colspec:
+            self.tree.heading(key, text=label)
+            self.tree.column(key, width=w, anchor=anchor)
 
-        self.tree.pack(side='left', fill='both', expand=True)
-        sb = ttk.Scrollbar(midfrm, orient='vertical', command=self.tree.yview)
-        sb.pack(side='right', fill='y')
+        self.tree.grid(row=0, column=0, sticky='nsew')
+        sb = ttk.Scrollbar(table_wrap, orient='vertical', command=self.tree.yview)
+        sb.grid(row=0, column=1, sticky='ns')
         self.tree.configure(yscroll=sb.set)
 
-        btns = ttk.Frame(self)
-        btns.pack(fill='x', padx=10)
+        actions = ttk.LabelFrame(self, text='Ações', padding=(12, 10))
+        actions.pack(fill='x', padx=12, pady=(4, 12))
 
-        ttk.Button(btns, text='Refresh', command=self.refresh).pack(side='left', padx=4)
-        ttk.Button(btns, text='Delete selected', command=self.delete_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Delete all', command=self.delete_all).pack(side='left', padx=4)
-        ttk.Button(btns, text='Set availability', command=self.set_availability_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Set stress (manual)', command=self.set_stress_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Reset load', command=self.reset_load_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Edit levels', command=self.edit_levels_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Set coord level', command=self.set_coord_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Blackout dates', command=self.set_blackouts_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Max dias/mês', command=self.set_max_days_selected).pack(side='left', padx=4)
+        left = ttk.Frame(actions)
+        left.pack(side='left', fill='x', expand=True)
+        ttk.Button(left, text='🔄 Refresh', command=self.refresh).pack(side='left', padx=4)
+        ttk.Button(left, text='📅 Disponibilidade', command=self.set_availability_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='⚡ Stress manual', command=self.set_stress_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='♻ Reset load', command=self.reset_load_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='✎ Editar níveis', command=self.edit_levels_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='🎚 Coord level', command=self.set_coord_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='🚫 Blackouts', command=self.set_blackouts_selected).pack(side='left', padx=4)
+        ttk.Button(left, text='📆 Max dias/mês', command=self.set_max_days_selected).pack(side='left', padx=4)
+
+        right = ttk.Frame(actions)
+        right.pack(side='right')
+        ttk.Button(right, text='🗑 Eliminar selecionado', style='Danger.TButton', command=self.delete_selected).pack(
+            side='left', padx=4
+        )
+        ttk.Button(right, text='🗑 Eliminar todos', style='Danger.TButton', command=self.delete_all).pack(
+            side='left', padx=4
+        )
 
         self.refresh()
+
+    def refresh_theme(self):
+        self.configure(bg=theme.current_colors()['bg'])
+        theme.configure_zebra(self.tree)
 
     def _selected(self):
         sel = self.tree.selection()
@@ -125,7 +139,8 @@ class MembersFrame(tk.Frame):
     def refresh(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
-        for r in list_members_db():
+        theme.configure_zebra(self.tree)
+        for idx, r in enumerate(list_members_db()):
             self.tree.insert('', 'end', values=(
                 r['id'],
                 r['name'],
@@ -137,7 +152,7 @@ class MembersFrame(tk.Frame):
                 float(r['load_stress'] or 0.0),
                 ("" if r['max_days_per_month'] is None else int(r['max_days_per_month'])),
                 r['availability'] or "",
-            ))
+            ), tags=(theme.row_tag(idx),))
 
     def delete_selected(self):
         vals = self._selected()
@@ -306,5 +321,3 @@ class MembersFrame(tk.Frame):
 
         messagebox.showinfo("OK", f"Limite mensal atualizado para {name}.")
         self.refresh()
-
-

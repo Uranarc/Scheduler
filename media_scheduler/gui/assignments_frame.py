@@ -12,6 +12,7 @@ from media_scheduler.db.assignments import (
 )
 from media_scheduler.db.events import list_events_db
 from media_scheduler.db.members import list_members_db
+from media_scheduler.gui import theme
 
 
 class AssignmentsFrame(tk.Frame):
@@ -20,27 +21,57 @@ class AssignmentsFrame(tk.Frame):
         self._build()
 
     def _build(self):
-        self.tree = ttk.Treeview(self, columns=('id', 'date', 'event', 'zone', 'member', 'name'), show='headings')
-        for h, w in [('id', 40), ('date', 120), ('event', 420), ('zone', 80), ('member', 80), ('name', 200)]:
-            self.tree.heading(h, text=h)
-            self.tree.column(h, width=w)
-        self.tree.pack(fill='both', expand=True, padx=10, pady=8)
+        self.configure(bg=theme.current_colors()['bg'])
+
+        table_wrap = ttk.Frame(self)
+        table_wrap.pack(fill='both', expand=True, padx=12, pady=(12, 4))
+        table_wrap.rowconfigure(0, weight=1)
+        table_wrap.columnconfigure(0, weight=1)
+
+        self.tree = ttk.Treeview(
+            table_wrap, columns=('id', 'date', 'event', 'zone', 'member', 'name'), show='headings'
+        )
+        for key, label, w, anchor in [
+            ('id', 'ID', 40, 'center'), ('date', 'Data', 120, 'center'),
+            ('event', 'Evento', 420, 'w'), ('zone', 'Zona', 80, 'center'),
+            ('member', 'Member ID', 80, 'center'), ('name', 'Nome', 200, 'w'),
+        ]:
+            self.tree.heading(key, text=label)
+            self.tree.column(key, width=w, anchor=anchor)
+        self.tree.grid(row=0, column=0, sticky='nsew')
+        sb = ttk.Scrollbar(table_wrap, orient='vertical', command=self.tree.yview)
+        sb.grid(row=0, column=1, sticky='ns')
+        self.tree.configure(yscroll=sb.set)
 
         btns = ttk.Frame(self)
-        btns.pack(fill='x', padx=10)
-        ttk.Button(btns, text='Refresh', command=self.refresh).pack(side='left', padx=4)
-        ttk.Button(btns, text='Edit selected', command=self.edit_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Add assignment', command=self.add_assignment).pack(side='left', padx=4)
-        ttk.Button(btns, text='Delete selected', command=self.delete_selected).pack(side='left', padx=4)
-        ttk.Button(btns, text='Delete all', command=self.delete_all).pack(side='left', padx=4)
+        btns.pack(fill='x', padx=12, pady=(4, 12))
+        ttk.Button(btns, text='🔄 Refresh', command=self.refresh).pack(side='left', padx=4)
+        ttk.Button(btns, text='✎ Editar selecionado', command=self.edit_selected).pack(side='left', padx=4)
+        ttk.Button(btns, text='＋ Adicionar assignment', style='Accent.TButton', command=self.add_assignment).pack(
+            side='left', padx=4
+        )
+        ttk.Button(btns, text='🗑 Eliminar selecionado', style='Danger.TButton', command=self.delete_selected).pack(
+            side='left', padx=4
+        )
+        ttk.Button(btns, text='🗑 Eliminar todos', style='Danger.TButton', command=self.delete_all).pack(
+            side='left', padx=4
+        )
 
         self.refresh()
+
+    def refresh_theme(self):
+        self.configure(bg=theme.current_colors()['bg'])
+        theme.configure_zebra(self.tree)
 
     def refresh(self):
         for i in self.tree.get_children():
             self.tree.delete(i)
-        for r in list_assignments_db():
-            self.tree.insert('', 'end', values=(r['aid'], r['evdate'], r['evname'], r['zone'], r['mid'], r['mname']))
+        theme.configure_zebra(self.tree)
+        for idx, r in enumerate(list_assignments_db()):
+            self.tree.insert(
+                '', 'end', values=(r['aid'], r['evdate'], r['evname'], r['zone'], r['mid'], r['mname']),
+                tags=(theme.row_tag(idx),)
+            )
 
     def _selected_values(self):
         sel = self.tree.selection()
@@ -61,6 +92,7 @@ class AssignmentsFrame(tk.Frame):
 
         dlg = tk.Toplevel(self)
         dlg.title('Edit assignment')
+        dlg.configure(bg=theme.current_colors()['bg'])
         dlg.transient(self)
         dlg.grab_set()
         dlg.resizable(False, False)
@@ -69,7 +101,9 @@ class AssignmentsFrame(tk.Frame):
         body.pack(fill='both', expand=True, padx=12, pady=12)
 
         ttk.Label(body, text=f'Event: {ev_date} | {ev_name}').grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 6))
-        ttk.Label(body, text=f'Zone: {zone}').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 8))
+        ttk.Label(body, text=f'Zone: {zone}', style='Muted.TLabel').grid(
+            row=1, column=0, columnspan=2, sticky='w', pady=(0, 8)
+        )
 
         members = list_members_db()
         member_items = [f"{m['name']} (id:{m['id']})" for m in members]
@@ -102,13 +136,14 @@ class AssignmentsFrame(tk.Frame):
             self.refresh()
 
         ttk.Button(btns, text='Cancel', command=dlg.destroy).pack(side='right', padx=(8, 0))
-        ttk.Button(btns, text='Confirm', command=on_confirm).pack(side='right')
+        ttk.Button(btns, text='Confirm', style='Accent.TButton', command=on_confirm).pack(side='right')
 
         dlg.wait_window()
 
     def add_assignment(self):
         dlg = tk.Toplevel(self)
         dlg.title('Add assignment')
+        dlg.configure(bg=theme.current_colors()['bg'])
         dlg.transient(self)
         dlg.grab_set()
         dlg.resizable(False, False)
@@ -171,7 +206,7 @@ class AssignmentsFrame(tk.Frame):
             self.refresh()
 
         ttk.Button(btns, text='Cancel', command=dlg.destroy).pack(side='right', padx=(8, 0))
-        ttk.Button(btns, text='Confirm', command=on_confirm).pack(side='right')
+        ttk.Button(btns, text='Confirm', style='Accent.TButton', command=on_confirm).pack(side='right')
 
         dlg.wait_window()
 
@@ -187,4 +222,3 @@ class AssignmentsFrame(tk.Frame):
         if messagebox.askyesno('Confirm', 'Delete ALL assignments? This cannot be undone.'):
             delete_all_assignments_db()
             self.refresh()
-
