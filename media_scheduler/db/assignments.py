@@ -3,11 +3,12 @@
 from datetime import UTC, datetime
 
 from media_scheduler.db.connection import get_conn
-from media_scheduler.db.members import recalculate_member_load_stress
+from media_scheduler.db.members import adjust_member_load_stress
+from media_scheduler.scheduler.load import compute_load_increment
 
 
 def list_assignments_db(start: str = None, end: str = None):
-    q = '''SELECT a.id as aid, e.date as evdate, e.name as evname, a.zone as zone,
+    q = '''SELECT a.id as aid, e.id as evid, e.date as evdate, e.name as evname, a.zone as zone,
                    a.member_id as mid, m.name as mname
             FROM assignments a
             JOIN events e ON a.event_id = e.id
@@ -21,24 +22,70 @@ def list_assignments_db(start: str = None, end: str = None):
         return conn.execute(q, params).fetchall()
 
 
-def update_assignment_member(assignment_id: int, member_id: int):
+def list_coordinators_in_range(start: str, end: str) -> dict:
+    """event_id -> coordinator name, for events in range that have one assigned."""
     with get_conn() as conn:
-        # Get old member id first
-        old_mid = conn.execute('SELECT member_id FROM assignments WHERE id = ?', (assignment_id,)).fetchone()
-        if old_mid:
-            old_mid = old_mid['member_id']
+        rows = conn.execute('''
+            SELECT ec.event_id AS event_id, m.name AS name
+            FROM event_coordinators ec
+            JOIN members m ON m.id = ec.member_id
+            JOIN events e ON e.id = ec.event_id
+            WHERE e.date BETWEEN ? AND ?
+        ''', (start, end)).fetchall()
+    return {r['event_id']: r['name'] for r in rows}
 
+
+def update_assignment_member(assignment_id: int, member_id: int, stress_increase: float = 1.0):
+    """
+    Reassign an existing (event, zone) slot to a different member.
+
+    Only the load contribution of THIS one assignment moves from the old
+    member to the new one — the rest of each member's load_stress (built up
+    over prior generations, with decay already applied) is left untouched.
+    """
+    with get_conn() as conn:
+        row = conn.execute('''
+            SELECT a.member_id AS old_member_id, a.zone AS zone, e.importance AS importance
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+            WHERE a.id = ?
+        ''', (assignment_id,)).fetchone()
+
+        if row is None:
+            return
+
+        old_member_id = row['old_member_id']
         conn.execute('UPDATE assignments SET member_id = ? WHERE id = ?', (member_id, assignment_id))
         conn.commit()
 
-    # Recalculate both old and new member's loads
-    if old_mid and old_mid != member_id:
-        recalculate_member_load_stress(old_mid)
-    recalculate_member_load_stress(member_id)
+    if old_member_id == member_id:
+        return  # no actual change
+
+    load_inc = compute_load_increment(row['zone'], row['importance'], stress_increase)
+    if old_member_id is not None:
+        adjust_member_load_stress(old_member_id, -load_inc)
+    adjust_member_load_stress(member_id, load_inc)
 
 
-def add_assignment_manual(event_id: int, zone: str, member_id: int):
+def add_assignment_manual(event_id: int, zone: str, member_id: int, stress_increase: float = 1.0):
+    """
+    Manually assign a member to an (event, zone) slot.
+
+    If the slot already had a different member assigned (upsert case), that
+    member's load contribution for this slot is removed and the new
+    member's is added — previously only the new member's load was touched,
+    leaving the replaced member's load permanently inflated.
+    """
     with get_conn() as conn:
+        importance_row = conn.execute('SELECT importance FROM events WHERE id = ?', (event_id,)).fetchone()
+        importance = int(importance_row['importance']) if importance_row else 1
+
+        existing = conn.execute(
+            'SELECT member_id FROM assignments WHERE event_id = ? AND zone = ?',
+            (event_id, zone)
+        ).fetchone()
+        old_member_id = existing['member_id'] if existing else None
+
         conn.execute('''
             INSERT INTO assignments (event_id, zone, member_id, assigned_at)
             VALUES (?, ?, ?, ?)
@@ -48,7 +95,13 @@ def add_assignment_manual(event_id: int, zone: str, member_id: int):
         ''', (event_id, zone, member_id, datetime.now(UTC).isoformat()))
         conn.commit()
 
-    recalculate_member_load_stress(member_id)
+    if old_member_id == member_id:
+        return  # re-assigning the same person to the same slot: no load change
+
+    load_inc = compute_load_increment(zone, importance, stress_increase)
+    if old_member_id is not None:
+        adjust_member_load_stress(old_member_id, -load_inc)
+    adjust_member_load_stress(member_id, load_inc)
 
 
 def get_load_summary(year: int, month: int) -> list[dict]:
@@ -107,36 +160,40 @@ def get_load_summary(year: int, month: int) -> list[dict]:
     return out
 
 
-def delete_assignment_db(assignment_id: int):
+def delete_assignment_db(assignment_id: int, stress_increase: float = 1.0):
     with get_conn() as conn:
-        # Get member id before deletion
-        row = conn.execute('SELECT member_id FROM assignments WHERE id = ?', (assignment_id,)).fetchone()
-        member_id = int(row['member_id']) if row else None
+        row = conn.execute('''
+            SELECT a.member_id AS member_id, a.zone AS zone, e.importance AS importance
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+            WHERE a.id = ?
+        ''', (assignment_id,)).fetchone()
 
         conn.execute('DELETE FROM assignments WHERE id = ?', (assignment_id,))
         conn.commit()
 
-    if member_id is not None:
-        recalculate_member_load_stress(member_id)
+    if row is not None:
+        load_inc = compute_load_increment(row['zone'], row['importance'], stress_increase)
+        adjust_member_load_stress(row['member_id'], -load_inc)
 
 
-def delete_all_assignments_db():
+def delete_all_assignments_db(stress_increase: float = 1.0):
     with get_conn() as conn:
-        # Get all member ids
-        member_ids = conn.execute('SELECT DISTINCT member_id FROM assignments').fetchall()
+        rows = conn.execute('''
+            SELECT a.member_id AS member_id, a.zone AS zone, e.importance AS importance
+            FROM assignments a
+            JOIN events e ON a.event_id = e.id
+        ''').fetchall()
         conn.execute('DELETE FROM assignments')
         conn.commit()
 
-    # Recalculate all members
-    for r in member_ids:
-        recalculate_member_load_stress(r['member_id'])
+    _reverse_load_by_member(rows, stress_increase)
 
 
-def delete_assignments_in_range(start: str, end: str):
+def delete_assignments_in_range(start: str, end: str, stress_increase: float = 1.0):
     with get_conn() as conn:
-        # Get all member ids affected
-        member_ids = conn.execute('''
-            SELECT DISTINCT a.member_id
+        rows = conn.execute('''
+            SELECT a.member_id AS member_id, a.zone AS zone, e.importance AS importance
             FROM assignments a
             JOIN events e ON a.event_id = e.id
             WHERE e.date BETWEEN ? AND ?
@@ -148,9 +205,22 @@ def delete_assignments_in_range(start: str, end: str):
         ''', (start, end))
         conn.commit()
 
-    # Recalculate affected members
-    for r in member_ids:
-        recalculate_member_load_stress(r['member_id'])
+    _reverse_load_by_member(rows, stress_increase)
+
+
+def _reverse_load_by_member(removed_assignment_rows, stress_increase: float = 1.0):
+    """Subtract the load contribution of each removed assignment from its member.
+
+    Batches per member so each member's load_stress is only written once,
+    even if several of their assignments were removed together.
+    """
+    totals = {}
+    for r in removed_assignment_rows:
+        load_inc = compute_load_increment(r['zone'], r['importance'], stress_increase)
+        totals[r['member_id']] = totals.get(r['member_id'], 0.0) + load_inc
+
+    for member_id, total in totals.items():
+        adjust_member_load_stress(member_id, -total)
 
 
 def delete_coordinators_in_range(start: str, end: str):
@@ -160,4 +230,3 @@ def delete_coordinators_in_range(start: str, end: str):
             WHERE event_id IN (SELECT id FROM events WHERE date BETWEEN ? AND ?)
         ''', (start, end))
         conn.commit()
-

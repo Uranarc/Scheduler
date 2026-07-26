@@ -23,6 +23,7 @@ from media_scheduler.db.events import list_events_db
 from media_scheduler.db.members import list_members_db
 from media_scheduler.scheduler.availability import _parse_availability_csv
 from media_scheduler.scheduler.coordinators import choose_coordinator
+from media_scheduler.scheduler.load import compute_load_increment
 
 
 def _load_helpers(sdate: date, edate: date):
@@ -122,7 +123,7 @@ def generate_schedule_db(
     edate = datetime.strptime(end, '%Y-%m-%d').date()
 
     if clear_existing_in_range:
-        delete_assignments_in_range(start, end)
+        delete_assignments_in_range(start, end, stress_increase=stress_increase)
         delete_coordinators_in_range(start, end)
 
     events = list_events_db(start, end)
@@ -316,8 +317,7 @@ def generate_schedule_db(
                 served_days.setdefault(best, {}).setdefault(key, set()).add(ev_date)
 
                 # add dynamic load
-                zw = float(ZONE_WEIGHTS.get(zone, 1.0))
-                load_inc = float(stress_increase) * (1 + 0.3 * (ev['importance'] - 1)) * (1 + 0.2 * (zw - 1))
+                load_inc = compute_load_increment(zone, ev['importance'], stress_increase)
                 current_load = float(member_map[best].get('load_stress', 0.0))
                 member_map[best]['load_stress'] = min(float(LOAD_CAP), current_load + load_inc)
 
@@ -361,5 +361,3 @@ def generate_schedule_db(
         'final_stresses': final_stresses,
         'missing': missing
     }
-
-

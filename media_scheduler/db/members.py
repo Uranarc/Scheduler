@@ -1,6 +1,6 @@
 """Repository functions for members and member blackout dates."""
 
-from media_scheduler.config import LOAD_CAP, ZONE_WEIGHTS
+from media_scheduler.config import LOAD_CAP
 from media_scheduler.db.connection import get_conn
 
 
@@ -95,27 +95,25 @@ def set_member_availability(member_id: int, availability_csv: str):
         conn.commit()
 
 
-def recalculate_member_load_stress(member_id: int, stress_increase: float = 1.0):
+def _clamp_load(value: float) -> float:
+    return max(0.0, min(float(LOAD_CAP), float(value)))
+
+
+def adjust_member_load_stress(member_id: int, delta: float):
     """
-    Recalculate member's load_stress based on current assignments.
-    Used after manual assignment edits to reflect actual workload.
+    Nudge a member's dynamic load_stress by `delta` (positive or negative),
+    clamped to [0, LOAD_CAP].
+
+    Used after manual assignment edits (add/edit/delete) so a single-row
+    change only shifts load by that assignment's contribution, instead of
+    recomputing load_stress from the member's entire historical assignment
+    list with no decay applied — which used to silently overwrite the
+    decayed value maintained by generate_schedule_db (see CHANGELOG).
     """
     with get_conn() as conn:
-        rows = conn.execute('''
-            SELECT a.zone AS zone, e.importance AS importance
-            FROM assignments a
-            JOIN events e ON a.event_id = e.id
-            WHERE a.member_id = ?
-        ''', (member_id,)).fetchall()
-
-        new_load = 0.0
-        for r in rows:
-            zone = r['zone']
-            importance = r['importance']
-            zw = float(ZONE_WEIGHTS.get(zone, 1.0))
-            load_inc = float(stress_increase) * (1 + 0.3 * (importance - 1)) * (1 + 0.2 * (zw - 1))
-            new_load += load_inc
-
-        new_load = min(float(LOAD_CAP), new_load)
-        conn.execute('UPDATE members SET load_stress = ? WHERE id = ?', (new_load, member_id))
+        row = conn.execute('SELECT load_stress FROM members WHERE id = ?', (member_id,)).fetchone()
+        if row is None:
+            return
+        new_val = _clamp_load(float(row['load_stress'] or 0.0) + delta)
+        conn.execute('UPDATE members SET load_stress = ? WHERE id = ?', (new_val, member_id))
         conn.commit()

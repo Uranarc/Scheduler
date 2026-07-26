@@ -3,6 +3,21 @@
 from datetime import date
 
 
+def _next_month_reference(reference_date: date | None = None) -> tuple[int, int]:
+    base = reference_date or date.today()
+    year = base.year
+    month = base.month + 1
+    if month == 13:
+        month = 1
+        year += 1
+    return year, month
+
+
+def _next_month_reference_date(reference_date: date | None = None) -> date:
+    year, month = _next_month_reference(reference_date)
+    return date(year, month, 1)
+
+
 def _safe_int(s: str, default=0):
     s = (s or '').strip()
     if s == '':

@@ -5,6 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from media_scheduler.db.assignments import get_load_summary
+from media_scheduler.utils.helpers import _next_month_reference
 
 
 class DashboardFrame(tk.Frame):
@@ -16,17 +17,17 @@ class DashboardFrame(tk.Frame):
         top = ttk.Frame(self)
         top.pack(fill='x', padx=10, pady=8)
 
-        today = date.today()
+        next_year, next_month = _next_month_reference()
 
         ttk.Label(top, text='Month').pack(side='left')
         self.month_cb = ttk.Combobox(top, values=[str(i) for i in range(1, 13)], state='readonly', width=5)
-        self.month_cb.set(str(today.month))
+        self.month_cb.set(str(next_month))
         self.month_cb.pack(side='left', padx=(4, 10))
 
         ttk.Label(top, text='Year').pack(side='left')
-        year_values = [str(y) for y in range(today.year - 5, today.year + 6)]
+        year_values = [str(y) for y in range(next_year - 5, next_year + 6)]
         self.year_cb = ttk.Combobox(top, values=year_values, state='readonly', width=7)
-        self.year_cb.set(str(today.year))
+        self.year_cb.set(str(next_year))
         self.year_cb.pack(side='left', padx=(4, 10))
 
         ttk.Button(top, text='Refresh', command=self.refresh).pack(side='left')

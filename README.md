@@ -11,12 +11,11 @@ PythonProject1/
 │  ├─ config.py               # Scheduling constants
 │  ├─ db/                     # SQLite access layer
 │  ├─ scheduler/              # Scheduling algorithm
-│  ├─ gui/                    # CustomTkinter UI
+│  ├─ gui/                    # Tkinter/ttk UI
 │  ├─ utils/                  # Shared helpers/formatting
 │  ├─ export.py               # CSV export
-│  ├─ requirements.txt        # Runtime dependencies
+│  ├─ requirements.txt        # Runtime dependencies (none currently — stdlib only)
 │  └─ README.md               # Detailed app docs
-├─ media_scheduler_legacy.py  # Legacy monolithic version (reference)
 └─ .gitignore
 ```
 
@@ -24,9 +23,11 @@ PythonProject1/
 
 ```bash
 cd media_scheduler
-pip install -r requirements.txt
 python main.py
 ```
+
+No external dependencies are required — the app runs on the Python standard library
+(`tkinter`, `sqlite3`) only.
 
 ## What is documented where
 
@@ -43,4 +44,3 @@ python main.py
 ## License
 
 This repository is licensed under the MIT License. See `LICENSE`.
-

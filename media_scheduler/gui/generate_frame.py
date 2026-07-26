@@ -1,11 +1,14 @@
-"""Schedule generation tab with controls, output text, and CSV export."""
+"""Schedule generation tab: controls, editable assignment table, and message preview."""
 
-import re
 from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from media_scheduler.db.assignments import update_assignment_member
+from media_scheduler.db.assignments import (
+    list_assignments_db,
+    list_coordinators_in_range,
+    update_assignment_member,
+)
 from media_scheduler.db.members import list_members_db
 from media_scheduler.export import export_assignments_csv
 from media_scheduler.gui.date_picker import pick_date_dialog
@@ -17,9 +20,9 @@ from media_scheduler.utils.helpers import _safe_float, _safe_int
 class GenerateFrame(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent)
-        self.last_rows = []
-        self.last_coords = {}
-        self.original_text = ""
+        self.last_start = None
+        self.last_end = None
+        self.last_missing = []
         self._build()
 
     def _build(self):
@@ -58,10 +61,40 @@ class GenerateFrame(tk.Frame):
 
         ttk.Button(frm, text='Generate schedule', command=self.generate).grid(row=1, column=3, padx=6)
         ttk.Button(frm, text='Export CSV', command=self.export_csv).grid(row=1, column=4, padx=6)
-        ttk.Button(frm, text='Save message changes', command=self.save_message_changes).grid(row=1, column=5, padx=6)
 
-        self.output = tk.Text(self, height=25)
-        self.output.pack(fill='both', expand=True, padx=10, pady=8)
+        # --- editable assignment table (source of truth; the message below is
+        # just a preview rendered FROM this data, never edited directly) ---
+        ttk.Label(self, text='Assignments (double-click, or select + Edit, to change a member)').pack(
+            anchor='w', padx=10, pady=(8, 0)
+        )
+
+        table_frm = ttk.Frame(self)
+        table_frm.pack(fill='both', expand=False, padx=10, pady=(2, 4))
+
+        self.tree = ttk.Treeview(
+            table_frm, columns=('aid', 'date', 'event', 'zone', 'member'), show='headings', height=10
+        )
+        for h, w in [('aid', 0), ('date', 100), ('event', 320), ('zone', 70), ('member', 160)]:
+            self.tree.heading(h, text=h if h != 'aid' else '')
+            self.tree.column(h, width=w, stretch=(h != 'aid'))
+        self.tree.column('aid', width=0, stretch=False)  # keep assignment id out of view, but addressable
+        self.tree.pack(side='left', fill='both', expand=True)
+        sb = ttk.Scrollbar(table_frm, orient='vertical', command=self.tree.yview)
+        sb.pack(side='right', fill='y')
+        self.tree.configure(yscroll=sb.set)
+        self.tree.bind('<Double-1>', lambda _e: self.edit_selected_assignment())
+
+        tbtns = ttk.Frame(self)
+        tbtns.pack(fill='x', padx=10)
+        ttk.Button(tbtns, text='Edit selected', command=self.edit_selected_assignment).pack(side='left', padx=4)
+
+        # --- read-only preview of the message that would be sent ---
+        ttk.Label(self, text='Message preview (auto-updates after edits above — not directly editable)').pack(
+            anchor='w', padx=10, pady=(8, 0)
+        )
+        self.output = tk.Text(self, height=16)
+        self.output.pack(fill='both', expand=True, padx=10, pady=(2, 8))
+        self.output.configure(state='disabled')
 
     def pick_start_date(self):
         chosen = pick_date_dialog(self, self.start_e.get().strip(), title='Select start date')
@@ -108,18 +141,48 @@ class GenerateFrame(tk.Frame):
             clear_existing_in_range=True
         )
 
-        rows = res.get('assignments', [])
-        coords = res.get('coordinators', {})
-        missing = res.get('missing', [])
+        self.last_start = s
+        self.last_end = e
+        self.last_missing = res.get('missing', [])
 
+        self._refresh_table_and_preview()
+
+        rows = res.get('assignments', [])
+        msg = f'{len(rows)} assignments created.'
+        if self.last_missing:
+            msg += f' Missing: {len(self.last_missing)}.'
+        messagebox.showinfo('Done', msg)
+
+    def _current_rows(self):
+        """Fetch assignments for the last generated range straight from the DB.
+
+        The DB is the single source of truth — no in-memory copy that could
+        drift out of sync after an edit.
+        """
+        if not self.last_start or not self.last_end:
+            return []
+        return list(list_assignments_db(self.last_start, self.last_end))
+
+    def _refresh_table_and_preview(self):
+        for i in self.tree.get_children():
+            self.tree.delete(i)
+
+        db_rows = self._current_rows()
+        for r in db_rows:
+            self.tree.insert('', 'end', values=(r['aid'], r['evdate'], r['evname'], r['zone'], r['mname']))
+
+        rows = [(r['evid'], r['evdate'], r['evname'], r['zone'], r['mid'], r['mname']) for r in db_rows]
+
+        self.output.configure(state='normal')
         self.output.delete('1.0', 'end')
 
-        if not rows and not missing:
+        if not rows and not self.last_missing:
             self.output.insert('end', 'No assignments created (no events in range?)\n')
-            self.last_rows = []
-            self.last_coords = {}
+            self.output.configure(state='disabled')
             return
 
+        sdate = datetime.strptime(self.last_start, '%Y-%m-%d').date()
+        edate = datetime.strptime(self.last_end, '%Y-%m-%d').date()
         month_label_map = {
             1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
             5: "maio", 6: "junho", 7: "julho", 8: "agosto",
@@ -127,110 +190,81 @@ class GenerateFrame(tk.Frame):
         }
         month_label = month_label_map.get(sdate.month, "este mês") if sdate.month == edate.month else "este período"
 
+        coords = list_coordinators_in_range(self.last_start, self.last_end)
         msg_text = format_month_message(rows, coords, month_label)
         self.output.insert('end', msg_text)
-        self.original_text = msg_text
 
-        if missing:
+        if self.last_missing:
             self.output.insert('end', '\nMISSING (no available member found):\n')
-            for (eid, ds, nm, zone) in missing:
+            for (eid, ds, nm, zone) in self.last_missing:
                 self.output.insert('end', f'  {ds} | {nm} | zone {zone}\n')
 
-        self.last_rows = rows
-        self.last_coords = coords
+        self.output.configure(state='disabled')
 
-        msg = f'{len(rows)} assignments created.'
-        if missing:
-            msg += f' Missing: {len(missing)}.'
-        messagebox.showinfo('Done', msg)
+    def _selected_assignment(self):
+        sel = self.tree.selection()
+        if not sel:
+            return None
+        return self.tree.item(sel[0])['values']
+
+    def edit_selected_assignment(self):
+        vals = self._selected_assignment()
+        if not vals:
+            messagebox.showerror('Error', 'Select an assignment first')
+            return
+
+        assignment_id = int(vals[0])
+        ev_date, ev_name, zone, current_name = vals[1], vals[2], vals[3], vals[4]
+
+        dlg = tk.Toplevel(self)
+        dlg.title('Edit assignment')
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.resizable(False, False)
+
+        body = ttk.Frame(dlg)
+        body.pack(fill='both', expand=True, padx=12, pady=12)
+
+        ttk.Label(body, text=f'{ev_date} | {ev_name}').grid(row=0, column=0, columnspan=2, sticky='w')
+        ttk.Label(body, text=f'Zone: {zone}').grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 8))
+
+        members = list_members_db()
+        member_items = [m['name'] for m in members]
+        member_lookup = {m['name']: int(m['id']) for m in members}
+
+        ttk.Label(body, text='Member').grid(row=2, column=0, sticky='w')
+        member_cb = ttk.Combobox(body, values=member_items, state='readonly', width=30)
+        member_cb.grid(row=2, column=1, sticky='w', padx=(6, 0))
+        if current_name in member_items:
+            member_cb.set(current_name)
+        elif member_items:
+            member_cb.current(0)
+
+        btns = ttk.Frame(body)
+        btns.grid(row=3, column=0, columnspan=2, sticky='e', pady=(12, 0))
+
+        def on_confirm():
+            selected = member_cb.get().strip()
+            if selected not in member_lookup:
+                messagebox.showerror('Error', 'Select a valid member.', parent=dlg)
+                return
+            update_assignment_member(assignment_id, member_lookup[selected])
+            dlg.destroy()
+            self._refresh_table_and_preview()
+
+        ttk.Button(btns, text='Cancel', command=dlg.destroy).pack(side='right', padx=(8, 0))
+        ttk.Button(btns, text='Confirm', command=on_confirm).pack(side='right')
+
+        dlg.wait_window()
 
     def export_csv(self):
-        if not self.last_rows:
+        db_rows = self._current_rows()
+        if not db_rows:
             messagebox.showerror('Error', 'No generated assignments to export')
             return
+        rows = [(r['evid'], r['evdate'], r['evname'], r['zone'], r['mid'], r['mname']) for r in db_rows]
         path = filedialog.asksaveasfilename(defaultextension='.csv', filetypes=[('CSV', '*.csv')])
         if not path:
             return
-        export_assignments_csv(path, self.last_rows)
+        export_assignments_csv(path, rows)
         messagebox.showinfo('Saved', f'Exported to {path}')
-
-    def save_message_changes(self):
-        """
-        Parse the edited text in the output window and apply changes to the DB.
-        Detects member name changes per zone and updates assignments.
-        """
-        if not self.last_rows:
-            messagebox.showerror('Error', 'No schedule generated yet')
-            return
-
-        current_text = self.output.get('1.0', 'end')
-
-        # Build a map: (date, event_name, zone) -> member_name from original text
-        original_map = {}
-        for (_, ds, evname, zone, _, mname) in self.last_rows:
-            original_map[(ds, evname, zone)] = mname
-
-        # Build a map: (date, event_name, zone) -> member_name from current text
-        current_map = self._parse_schedule_text(current_text)
-
-        # Find differences and update
-        members = list_members_db()
-        member_lookup = {m['name']: m['id'] for m in members}
-
-        changes = []
-        for key, old_name in original_map.items():
-            new_name = current_map.get(key, old_name)
-            if new_name != old_name:
-                ds, evname, zone = key
-                # Find the assignment id for this (date, event_name, zone, old_name)
-                for (aid, r_ds, r_evname, r_zone, r_mid, r_mname) in self.last_rows:
-                    if r_ds == ds and r_evname == evname and r_zone == zone and r_mname == old_name:
-                        # New member must exist
-                        if new_name not in member_lookup:
-                            messagebox.showerror('Error', f'Member "{new_name}" not found in DB')
-                            return
-                        new_mid = member_lookup[new_name]
-                        update_assignment_member(aid, new_mid)
-                        changes.append(f'{ds} | {evname} | {zone}: {old_name} → {new_name}')
-                        break
-
-        if changes:
-            msg = f'Applied {len(changes)} changes:\n\n' + '\n'.join(changes)
-            messagebox.showinfo('Done', msg)
-        else:
-            messagebox.showinfo('Info', 'No changes detected')
-
-    def _parse_schedule_text(self, text: str) -> dict:
-        """
-        Parse the schedule text and extract (date, event_name, zone) -> member_name.
-        Looks for patterns like "• Segunda, 01/01 – Culto de Ceia" and "Slide – Isaac".
-        """
-        result = {}
-        lines = text.split('\n')
-
-        current_date = None
-        current_event = None
-
-        for i, line in enumerate(lines):
-            # Match event header: "• Weekday, dd/mm – Event Name"
-            event_match = re.match(r'^• .+?, \d{2}/\d{2} – (.+)$', line.strip())
-            if event_match:
-                # Extract date from previous lines
-                for j in range(i - 1, max(0, i - 5), -1):
-                    date_match = re.search(r'(\d{4}-\d{2}-\d{2})', lines[j])
-                    if date_match:
-                        current_date = date_match.group(1)
-                        break
-                current_event = event_match.group(1).strip()
-                continue
-
-            # Match zone assignments: "Slide – Name" or " Slide – Name"
-            zone_match = re.match(r'^\s*(Slide|Luzes|Live)\s*–\s*(.+)$', line.strip())
-            if zone_match and current_date and current_event:
-                zone = zone_match.group(1).lower()
-                member_name = zone_match.group(2).strip()
-                if member_name != '—':  # Ignore empty assignments
-                    result[(current_date, current_event, zone)] = member_name
-
-        return result
-

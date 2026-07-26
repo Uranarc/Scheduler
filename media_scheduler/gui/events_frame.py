@@ -13,7 +13,7 @@ from media_scheduler.db.events import (
     list_events_db,
 )
 from media_scheduler.gui.date_picker import pick_date_dialog
-from media_scheduler.utils.helpers import _safe_int
+from media_scheduler.utils.helpers import _next_month_reference, _safe_int
 
 
 class EventsFrame(tk.Frame):
@@ -105,11 +105,11 @@ class EventsFrame(tk.Frame):
             self.refresh()
 
     def generate_fixed_events_dialog(self):
-        today = date.today()
-        m = simpledialog.askinteger('Month', 'Month (1-12):', initialvalue=today.month, minvalue=1, maxvalue=12)
+        next_year, next_month = _next_month_reference()
+        m = simpledialog.askinteger('Month', 'Month (1-12):', initialvalue=next_month, minvalue=1, maxvalue=12)
         if m is None:
             return
-        y = simpledialog.askinteger('Year', 'Year (e.g. 2026):', initialvalue=today.year, minvalue=1900, maxvalue=3000)
+        y = simpledialog.askinteger('Year', 'Year (e.g. 2026):', initialvalue=next_year, minvalue=1900, maxvalue=3000)
         if y is None:
             return
 
@@ -118,11 +118,11 @@ class EventsFrame(tk.Frame):
         messagebox.showinfo('Done', f'Created {len(created)} fixed events for {m}/{y} (skipped existing dates).')
 
     def delete_events_month_dialog(self):
-        today = date.today()
-        m = simpledialog.askinteger('Month', 'Month (1-12):', initialvalue=today.month, minvalue=1, maxvalue=12)
+        next_year, next_month = _next_month_reference()
+        m = simpledialog.askinteger('Month', 'Month (1-12):', initialvalue=next_month, minvalue=1, maxvalue=12)
         if m is None:
             return
-        y = simpledialog.askinteger('Year', 'Year (e.g. 2026):', initialvalue=today.year, minvalue=1900, maxvalue=3000)
+        y = simpledialog.askinteger('Year', 'Year (e.g. 2026):', initialvalue=next_year, minvalue=1900, maxvalue=3000)
         if y is None:
             return
 

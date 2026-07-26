@@ -5,6 +5,8 @@ from datetime import date, datetime
 import tkinter as tk
 from tkinter import ttk
 
+from media_scheduler.utils.helpers import _next_month_reference_date
+
 
 class DatePickerDialog(tk.Toplevel):
     def __init__(self, parent, initial_date: date | None = None, title: str = "Select date"):
@@ -14,7 +16,7 @@ class DatePickerDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
 
-        initial = initial_date or date.today()
+        initial = initial_date or _next_month_reference_date()
         self.result: str | None = None
         self.year_var = tk.IntVar(value=initial.year)
         self.month_var = tk.IntVar(value=initial.month)
@@ -88,7 +90,7 @@ class DatePickerDialog(tk.Toplevel):
 
 
 def pick_date_dialog(parent, current_iso: str = '', title: str = 'Select date') -> str | None:
-    initial = date.today()
+    initial = _next_month_reference_date()
     if current_iso:
         try:
             initial = datetime.strptime(current_iso, '%Y-%m-%d').date()
