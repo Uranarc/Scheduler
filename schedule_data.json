@@ -74,207 +74,187 @@
   "events": [
     {
       "id": 1,
-      "name": "Ceia - Domingo 2026-08-02",
-      "date": "2026-08-02"
+      "name": "Culto da Palavra - Quarta 2026-09-02",
+      "date": "2026-09-02"
     },
     {
       "id": 2,
-      "name": "Culto da Palavra - Quarta 2026-08-05",
-      "date": "2026-08-05"
+      "name": "Ceia - Domingo 2026-09-06",
+      "date": "2026-09-06"
     },
     {
-      "id": 12,
-      "name": "Conferência Profética",
-      "date": "2026-08-08"
+      "id": 3,
+      "name": "Quarta em Família - Quarta 2026-09-09",
+      "date": "2026-09-09"
     },
     {
-      "id": 13,
-      "name": "Conferência Profética",
-      "date": "2026-08-09"
+      "id": 4,
+      "name": "Culto de Mulheres - Sábado 2026-09-12",
+      "date": "2026-09-12"
     },
     {
       "id": 5,
-      "name": "Quarta em Família - Quarta 2026-08-12",
-      "date": "2026-08-12"
+      "name": "Culto da Família - Domingo 2026-09-13",
+      "date": "2026-09-13"
     },
     {
-      "id": 14,
-      "name": "Aniversário da Igreja",
-      "date": "2026-08-14"
+      "id": 6,
+      "name": "Culto da Palavra - Quarta 2026-09-16",
+      "date": "2026-09-16"
     },
     {
-      "id": 15,
-      "name": "Aniversário da Igreja",
-      "date": "2026-08-15"
-    },
-    {
-      "id": 16,
-      "name": "Aniversário da Igreja",
-      "date": "2026-08-16"
+      "id": 7,
+      "name": "Revolution - Sábado 2026-09-19",
+      "date": "2026-09-19"
     },
     {
       "id": 8,
-      "name": "Culto da Palavra - Quarta 2026-08-19",
-      "date": "2026-08-19"
+      "name": "Culto da Família - Domingo 2026-09-20",
+      "date": "2026-09-20"
     },
     {
       "id": 9,
-      "name": "Culto da Família - Domingo 2026-08-23",
-      "date": "2026-08-23"
+      "name": "Culto da Palavra - Quarta 2026-09-23",
+      "date": "2026-09-23"
     },
     {
       "id": 10,
-      "name": "Culto da Palavra - Quarta 2026-08-26",
-      "date": "2026-08-26"
+      "name": "Culto da Família - Domingo 2026-09-27",
+      "date": "2026-09-27"
     },
     {
       "id": 11,
-      "name": "Culto da Família - Domingo 2026-08-30",
-      "date": "2026-08-30"
+      "name": "Culto da Palavra - Quarta 2026-09-30",
+      "date": "2026-09-30"
     }
   ],
   "assignments": [
     {
       "event_id": 1,
       "zone": "slide",
-      "member_id": 10
-    },
-    {
-      "event_id": 1,
-      "zone": "luzes",
       "member_id": 2
     },
     {
       "event_id": 1,
-      "zone": "live",
-      "member_id": 9
-    },
-    {
-      "event_id": 2,
-      "zone": "slide",
-      "member_id": 6
-    },
-    {
-      "event_id": 2,
-      "zone": "luzes",
-      "member_id": 7
-    },
-    {
-      "event_id": 2,
-      "zone": "live",
-      "member_id": 12
-    },
-    {
-      "event_id": 12,
-      "zone": "slide",
-      "member_id": 14
-    },
-    {
-      "event_id": 12,
       "zone": "luzes",
       "member_id": 3
     },
     {
-      "event_id": 12,
+      "event_id": 1,
       "zone": "live",
-      "member_id": 15
+      "member_id": 14
     },
     {
-      "event_id": 13,
+      "event_id": 2,
       "zone": "slide",
       "member_id": 10
     },
     {
-      "event_id": 13,
+      "event_id": 2,
       "zone": "luzes",
       "member_id": 6
     },
     {
-      "event_id": 13,
+      "event_id": 2,
       "zone": "live",
-      "member_id": 7
+      "member_id": 4
     },
     {
-      "event_id": 5,
+      "event_id": 3,
       "zone": "slide",
-      "member_id": 2
-    },
-    {
-      "event_id": 5,
-      "zone": "luzes",
-      "member_id": 15
-    },
-    {
-      "event_id": 5,
-      "zone": "live",
       "member_id": 12
     },
     {
-      "event_id": 14,
-      "zone": "slide",
-      "member_id": 6
-    },
-    {
-      "event_id": 14,
+      "event_id": 3,
       "zone": "luzes",
       "member_id": 7
     },
     {
-      "event_id": 14,
-      "zone": "live",
-      "member_id": 14
-    },
-    {
-      "event_id": 15,
-      "zone": "slide",
-      "member_id": 12
-    },
-    {
-      "event_id": 15,
-      "zone": "luzes",
-      "member_id": 3
-    },
-    {
-      "event_id": 15,
+      "event_id": 3,
       "zone": "live",
       "member_id": 2
     },
     {
-      "event_id": 16,
+      "event_id": 4,
       "zone": "slide",
-      "member_id": 16
-    },
-    {
-      "event_id": 16,
-      "zone": "luzes",
-      "member_id": 6
-    },
-    {
-      "event_id": 16,
-      "zone": "live",
       "member_id": 15
     },
     {
-      "event_id": 8,
-      "zone": "slide",
-      "member_id": 14
-    },
-    {
-      "event_id": 8,
+      "event_id": 4,
       "zone": "luzes",
       "member_id": 3
     },
     {
-      "event_id": 8,
+      "event_id": 4,
       "zone": "live",
-      "member_id": 12
+      "member_id": 14
     },
     {
-      "event_id": 9,
+      "event_id": 5,
       "zone": "slide",
       "member_id": 9
     },
     {
+      "event_id": 5,
+      "zone": "luzes",
+      "member_id": 4
+    },
+    {
+      "event_id": 5,
+      "zone": "live",
+      "member_id": 10
+    },
+    {
+      "event_id": 6,
+      "zone": "slide",
+      "member_id": 2
+    },
+    {
+      "event_id": 6,
+      "zone": "luzes",
+      "member_id": 7
+    },
+    {
+      "event_id": 6,
+      "zone": "live",
+      "member_id": 12
+    },
+    {
+      "event_id": 7,
+      "zone": "slide",
+      "member_id": 6
+    },
+    {
+      "event_id": 7,
+      "zone": "luzes",
+      "member_id": 15
+    },
+    {
+      "event_id": 7,
+      "zone": "live",
+      "member_id": 14
+    },
+    {
+      "event_id": 8,
+      "zone": "slide",
+      "member_id": 16
+    },
+    {
+      "event_id": 8,
+      "zone": "luzes",
+      "member_id": 9
+    },
+    {
+      "event_id": 8,
+      "zone": "live",
+      "member_id": 4
+    },
+    {
+      "event_id": 9,
+      "zone": "slide",
+      "member_id": 3
+    },
+    {
       "event_id": 9,
       "zone": "luzes",
       "member_id": 7
@@ -282,32 +262,32 @@
     {
       "event_id": 9,
       "zone": "live",
-      "member_id": 15
-    },
-    {
-      "event_id": 10,
-      "zone": "slide",
       "member_id": 12
     },
     {
       "event_id": 10,
+      "zone": "slide",
+      "member_id": 4
+    },
+    {
+      "event_id": 10,
       "zone": "luzes",
-      "member_id": 3
+      "member_id": 6
     },
     {
       "event_id": 10,
       "zone": "live",
-      "member_id": 14
+      "member_id": 15
     },
     {
       "event_id": 11,
       "zone": "slide",
-      "member_id": 16
+      "member_id": 14
     },
     {
       "event_id": 11,
       "zone": "luzes",
-      "member_id": 15
+      "member_id": 3
     },
     {
       "event_id": 11,
