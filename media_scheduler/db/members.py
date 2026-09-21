@@ -49,13 +49,31 @@ def list_blackouts_for_member_db(member_id: int):
 
 
 def add_member(name: str, live: int, luzes: int, slide: int, coord_level: int = 0,
-               stress: float = 0.0, availability: str = ''):
+               stress: float = 0.0, availability: str = '', phone: str = ''):
     with get_conn() as conn:
         conn.execute(
-            'INSERT INTO members (name, live_level, luzes_level, slide_level, coord_level, stress, load_stress, max_days_per_month, availability) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (name, live, luzes, slide, coord_level, stress, 0.0, None, availability)
+            'INSERT INTO members (name, live_level, luzes_level, slide_level, coord_level, stress, load_stress, max_days_per_month, availability, phone) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            (name, live, luzes, slide, coord_level, round(float(stress), 2), 0.0, None, availability, phone)
         )
+        conn.commit()
+
+
+def update_member_full(member_id: int, name: str, phone: str, live: int, luzes: int, slide: int,
+                       coord: int, stress: float, max_days: int | None, availability: str):
+    with get_conn() as conn:
+        conn.execute('''
+            UPDATE members
+            SET name = ?, phone = ?, live_level = ?, luzes_level = ?, slide_level = ?,
+                coord_level = ?, stress = ?, max_days_per_month = ?, availability = ?
+            WHERE id = ?
+        ''', (name, phone, live, luzes, slide, coord, round(float(stress), 2), max_days, availability, member_id))
+        conn.commit()
+
+
+def set_member_phone(member_id: int, phone: str):
+    with get_conn() as conn:
+        conn.execute('UPDATE members SET phone = ? WHERE id = ?', (phone.strip(), member_id))
         conn.commit()
 
 
@@ -85,7 +103,7 @@ def update_member_level(member_id: int, zone: str, level: int):
 
 def set_member_stress(member_id: int, value: float):
     with get_conn() as conn:
-        conn.execute('UPDATE members SET stress = ? WHERE id = ?', (value, member_id))
+        conn.execute('UPDATE members SET stress = ? WHERE id = ?', (round(float(value), 2), member_id))
         conn.commit()
 
 
@@ -96,19 +114,13 @@ def set_member_availability(member_id: int, availability_csv: str):
 
 
 def _clamp_load(value: float) -> float:
-    return max(0.0, min(float(LOAD_CAP), float(value)))
+    return round(max(0.0, min(float(LOAD_CAP), float(value))), 2)
 
 
 def adjust_member_load_stress(member_id: int, delta: float):
     """
     Nudge a member's dynamic load_stress by `delta` (positive or negative),
     clamped to [0, LOAD_CAP].
-
-    Used after manual assignment edits (add/edit/delete) so a single-row
-    change only shifts load by that assignment's contribution, instead of
-    recomputing load_stress from the member's entire historical assignment
-    list with no decay applied — which used to silently overwrite the
-    decayed value maintained by generate_schedule_db (see CHANGELOG).
     """
     with get_conn() as conn:
         row = conn.execute('SELECT load_stress FROM members WHERE id = ?', (member_id,)).fetchone()

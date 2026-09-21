@@ -1,6 +1,6 @@
 """Repository functions for assignments, coordinator cleanup, and dashboard summaries."""
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from media_scheduler.db.connection import get_conn
 from media_scheduler.db.members import adjust_member_load_stress
@@ -92,7 +92,7 @@ def add_assignment_manual(event_id: int, zone: str, member_id: int, stress_incre
             ON CONFLICT(event_id, zone) DO UPDATE SET
                 member_id = excluded.member_id,
                 assigned_at = excluded.assigned_at
-        ''', (event_id, zone, member_id, datetime.now(UTC).isoformat()))
+        ''', (event_id, zone, member_id, datetime.now(timezone.utc).isoformat()))
         conn.commit()
 
     if old_member_id == member_id:
@@ -151,8 +151,8 @@ def get_load_summary(year: int, month: int) -> list[dict]:
             'luzes_count': int(r['luzes_count'] or 0),
             'live_count': int(r['live_count'] or 0),
             'total_days': total_days,
-            'load_stress': float(r['load_stress'] or 0.0),
-            'manual_stress': float(r['manual_stress'] or 0.0),
+            'load_stress': round(float(r['load_stress'] or 0.0), 2),
+            'manual_stress': round(float(r['manual_stress'] or 0.0), 2),
             'max_days': (None if max_days is None else int(max_days)),
             'days_remaining': days_remaining,
             'over_limit': (max_days is not None and total_days > int(max_days)),
@@ -220,7 +220,7 @@ def _reverse_load_by_member(removed_assignment_rows, stress_increase: float = 1.
         totals[r['member_id']] = totals.get(r['member_id'], 0.0) + load_inc
 
     for member_id, total in totals.items():
-        adjust_member_load_stress(member_id, -total)
+        adjust_member_load_stress(member_id, -round(total, 2))
 
 
 def delete_coordinators_in_range(start: str, end: str):

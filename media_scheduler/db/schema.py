@@ -41,12 +41,20 @@ def _migration_002_add_coord_level_column(conn):
         conn.execute('ALTER TABLE members ADD COLUMN coord_level INTEGER DEFAULT 0')
 
 
+def _migration_003_add_phone_column(conn):
+    """members.phone (WhatsApp number, used by the notifications service)."""
+    cols = [r["name"] for r in conn.execute("PRAGMA table_info(members)").fetchall()]
+    if "phone" not in cols:
+        conn.execute("ALTER TABLE members ADD COLUMN phone TEXT DEFAULT ''")
+
+
 # Ordered oldest -> newest, 1-indexed by position. Append new migrations
 # here; never reorder or remove existing ones. len(MIGRATIONS) is the
 # current schema version.
 MIGRATIONS = [
     _migration_001_add_load_and_max_days_columns,
     _migration_002_add_coord_level_column,
+    _migration_003_add_phone_column,
 ]
 
 CURRENT_SCHEMA_VERSION = len(MIGRATIONS)
@@ -86,7 +94,8 @@ def init_db():
             stress REAL DEFAULT 0,              -- manual/base (you set)
             load_stress REAL DEFAULT 0,         -- dynamic load (system)
             max_days_per_month INTEGER,         -- NULL = no limit
-            availability TEXT DEFAULT ''
+            availability TEXT DEFAULT '',
+            phone TEXT DEFAULT ''                -- WhatsApp number, e.g. 351912345678
         )''')
 
         c.execute('''CREATE TABLE IF NOT EXISTS events (
@@ -143,10 +152,10 @@ def init_db():
         if n == 0:
             rows = []
             for (nm, live, luz, sl, avail, coord) in SEED_MEMBERS:
-                rows.append((nm, live, luz, sl, coord, 0.0, 0.0, None, avail))
+                rows.append((nm, live, luz, sl, coord, 0.0, 0.0, None, avail, ''))
             conn.executemany(
-                "INSERT INTO members (name, live_level, luzes_level, slide_level, coord_level, stress, load_stress, max_days_per_month, availability) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO members (name, live_level, luzes_level, slide_level, coord_level, stress, load_stress, max_days_per_month, availability, phone) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rows
             )
 

@@ -5,7 +5,7 @@ from tkinter import ttk
 
 from media_scheduler.db.assignments import get_load_summary
 from media_scheduler.gui import theme
-from media_scheduler.utils.helpers import _next_month_reference
+from media_scheduler.utils.helpers import PT_MONTHS, _next_month_reference
 
 
 class DashboardFrame(tk.Frame):
@@ -16,23 +16,26 @@ class DashboardFrame(tk.Frame):
     def _build(self):
         self.configure(bg=theme.current_colors()['bg'])
 
-        top = ttk.LabelFrame(self, text='Período', padding=(12, 10))
+        top = ttk.LabelFrame(self, text='Período de análise', padding=(12, 10))
         top.pack(fill='x', padx=12, pady=(12, 8))
 
         next_year, next_month = _next_month_reference()
 
-        ttk.Label(top, text='Month').pack(side='left')
-        self.month_cb = ttk.Combobox(top, values=[str(i) for i in range(1, 13)], state='readonly', width=5)
-        self.month_cb.set(str(next_month))
+        ttk.Label(top, text='Mês').pack(side='left')
+        month_labels = [f"{m:02d} - {PT_MONTHS[m]}" for m in range(1, 13)]
+        self.month_str_var = tk.StringVar(value=month_labels[next_month - 1])
+        self.month_cb = ttk.Combobox(
+            top, values=month_labels, textvariable=self.month_str_var, state='readonly', width=16
+        )
         self.month_cb.pack(side='left', padx=(6, 16))
 
-        ttk.Label(top, text='Year').pack(side='left')
+        ttk.Label(top, text='Ano').pack(side='left')
         year_values = [str(y) for y in range(next_year - 5, next_year + 6)]
         self.year_cb = ttk.Combobox(top, values=year_values, state='readonly', width=7)
         self.year_cb.set(str(next_year))
         self.year_cb.pack(side='left', padx=(6, 16))
 
-        ttk.Button(top, text='🔄 Refresh', style='Accent.TButton', command=self.refresh).pack(side='left')
+        ttk.Button(top, text='🔄 Atualizar', style='Accent.TButton', command=self.refresh).pack(side='left')
 
         ttk.Label(
             self, text='●  a vermelho: membros acima do limite mensal de dias', style='Muted.TLabel'
@@ -55,9 +58,9 @@ class DashboardFrame(tk.Frame):
             ('luzes_count', 'Luzes', 95, 'center'),
             ('live_count', 'Live', 90, 'center'),
             ('total_days', 'Total dias', 90, 'center'),
-            ('load_stress', 'Load stress', 95, 'center'),
-            ('manual_stress', 'Manual stress', 100, 'center'),
-            ('max_days', 'Max dias', 80, 'center'),
+            ('load_stress', 'Carga dinâmica', 105, 'center'),
+            ('manual_stress', 'Stress manual', 105, 'center'),
+            ('max_days', 'Máx dias', 80, 'center'),
             ('days_remaining', 'Dias restantes', 110, 'center'),
         ]
         for h, label, w, anchor in spec:
@@ -86,9 +89,10 @@ class DashboardFrame(tk.Frame):
         })
 
         try:
-            month = int(self.month_cb.get())
+            month_val = self.month_str_var.get().split(' - ')[0]
+            month = int(month_val)
             year = int(self.year_cb.get())
-        except ValueError:
+        except (ValueError, IndexError):
             return
 
         rows = get_load_summary(year, month)
@@ -112,8 +116,8 @@ class DashboardFrame(tk.Frame):
                 r['luzes_count'],
                 r['live_count'],
                 r['total_days'],
-                r['load_stress'],
-                r['manual_stress'],
+                f"{float(r['load_stress'] or 0.0):.2f}",
+                f"{float(r['manual_stress'] or 0.0):.2f}",
                 max_days_text,
                 days_remaining_text,
             ), tags=tuple(tags))

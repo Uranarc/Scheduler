@@ -1,0 +1,5 @@
+node_modules/
+auth_state/
+notify.db
+notify.db-*
+config.json

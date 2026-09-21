@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from media_scheduler.utils.helpers import _format_pt_date, _pt_weekday_name
+from media_scheduler.utils.helpers import PT_MONTHS, _format_pt_date, _pt_weekday_name, parse_date_input
 
 
 def _format_event_title(ev_name: str) -> str:
@@ -22,15 +22,12 @@ def _format_event_title(ev_name: str) -> str:
 
 
 def format_month_message(assign_rows, coordinators_map: dict[int, str], month_label: str) -> str:
-    month_label_map = {
-        1: "janeiro", 2: "fevereiro", 3: "março", 4: "abril",
-        5: "maio", 6: "junho", 7: "julho", 8: "agosto",
-        9: "setembro", 10: "outubro", 11: "novembro", 12: "dezembro",
-    }
+    month_label_map = {k: v.lower() for k, v in PT_MONTHS.items()}
 
     if assign_rows:
         month_keys = sorted({
-            (datetime.strptime(ds, "%Y-%m-%d").date().year, datetime.strptime(ds, "%Y-%m-%d").date().month)
+            ((parse_date_input(ds) or datetime.strptime(ds, "%Y-%m-%d").date()).year,
+             (parse_date_input(ds) or datetime.strptime(ds, "%Y-%m-%d").date()).month)
             for (_, ds, _, _, _, _) in assign_rows
         })
         labels = [month_label_map.get(mm, str(mm)) for (_, mm) in month_keys]
@@ -60,7 +57,7 @@ def format_month_message(assign_rows, coordinators_map: dict[int, str], month_la
 
     out = [intro]
     for (ds, eid, evname) in keys_sorted:
-        d = datetime.strptime(ds, "%Y-%m-%d").date()
+        d = parse_date_input(ds) or datetime.strptime(ds, "%Y-%m-%d").date()
         weekday = _pt_weekday_name(d)
         ddmm = _format_pt_date(d)
         title = _format_event_title(evname)
@@ -80,5 +77,3 @@ def format_month_message(assign_rows, coordinators_map: dict[int, str], month_la
         out.append(f" Live – {live}\n\n")
 
     return "".join(out)
-
-

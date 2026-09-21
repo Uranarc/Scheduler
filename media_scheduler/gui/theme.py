@@ -22,6 +22,9 @@ LIGHT = {
     'accent': '#3b6fe0',
     'accent_active': '#2f5cc0',
     'accent_fg': '#ffffff',
+    'success': '#22863a',
+    'success_active': '#1e7232',
+    'success_fg': '#ffffff',
     'danger': '#d33d3d',
     'danger_active': '#b83232',
     'danger_fg': '#ffffff',
@@ -31,6 +34,9 @@ LIGHT = {
     'header_bg': '#ebeef2',
     'entry_bg': '#ffffff',
     'disabled_fg': '#a7adb5',
+    'tag_slide': '#0969da',
+    'tag_luzes': '#b08800',
+    'tag_live': '#8250df',
 }
 
 DARK = {
@@ -41,6 +47,9 @@ DARK = {
     'accent': '#5b93ff',
     'accent_active': '#78a5ff',
     'accent_fg': '#0b1220',
+    'success': '#3fb950',
+    'success_active': '#56d364',
+    'success_fg': '#0b1220',
     'danger': '#ff6b6b',
     'danger_active': '#ff8585',
     'danger_fg': '#1a0000',
@@ -50,6 +59,9 @@ DARK = {
     'header_bg': '#2b303b',
     'entry_bg': '#2b303b',
     'disabled_fg': '#5f6672',
+    'tag_slide': '#58a6ff',
+    'tag_luzes': '#d29922',
+    'tag_live': '#bc8cff',
 }
 
 _current_mode = 'light'
@@ -90,9 +102,11 @@ def _pick_font_family() -> str:
 def fonts() -> dict:
     family = _pick_font_family()
     return {
+        'small': (family, 8),
         'base': (family, 10),
         'bold': (family, 10, 'bold'),
         'title': (family, 15, 'bold'),
+        'heading': (family, 11, 'bold'),
         'mono': ('Consolas' if 'Consolas' in set(tkfont.families()) else family, 10),
     }
 
@@ -102,6 +116,9 @@ def configure_zebra(tree, extra_tags=None):
     c = current_colors()
     tree.tag_configure('evenrow', background=c['surface'], foreground=c['fg'])
     tree.tag_configure('oddrow', background=c['row_alt'], foreground=c['fg'])
+    tree.tag_configure('zone_slide', foreground=c['tag_slide'])
+    tree.tag_configure('zone_luzes', foreground=c['tag_luzes'])
+    tree.tag_configure('zone_live', foreground=c['tag_live'])
     if extra_tags:
         for tag, kwargs in extra_tags.items():
             tree.tag_configure(tag, **kwargs)
@@ -133,6 +150,7 @@ def apply_theme(root, mode: str) -> dict:
     style.configure('Muted.TLabel', background=c['bg'], foreground=c['muted_fg'], font=base_font)
     style.configure('Title.TLabel', background=c['bg'], foreground=c['fg'], font=title_font)
     style.configure('Heading.TLabel', background=c['bg'], foreground=c['fg'], font=bold_font)
+    style.configure('Success.TLabel', background=c['bg'], foreground=c['success'], font=bold_font)
 
     style.configure(
         'TLabelframe', background=c['bg'], foreground=c['fg'],
@@ -162,6 +180,16 @@ def apply_theme(root, mode: str) -> dict:
     )
 
     style.configure(
+        'Success.TButton', background=c['success'], foreground=c['success_fg'],
+        bordercolor=c['success'], padding=(10, 6), font=bold_font, relief='flat',
+    )
+    style.map(
+        'Success.TButton',
+        background=[('active', c['success_active']), ('disabled', c['border'])],
+        foreground=[('disabled', c['disabled_fg'])],
+    )
+
+    style.configure(
         'Danger.TButton', background=c['surface'], foreground=c['danger'],
         bordercolor=c['danger'], padding=(10, 6), font=base_font, relief='flat',
     )
@@ -183,6 +211,16 @@ def apply_theme(root, mode: str) -> dict:
     )
     style.map(
         'TEntry',
+        fieldbackground=[('disabled', c['bg'])],
+        bordercolor=[('focus', c['accent'])],
+    )
+
+    style.configure(
+        'TSpinbox', fieldbackground=c['entry_bg'], foreground=c['fg'],
+        bordercolor=c['border'], insertcolor=c['fg'], arrowcolor=c['muted_fg'], padding=4,
+    )
+    style.map(
+        'TSpinbox',
         fieldbackground=[('disabled', c['bg'])],
         bordercolor=[('focus', c['accent'])],
     )

@@ -1,0 +1,16 @@
+{
+  "name": "scheduler-notify-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serviço 24/7 de lembretes e confirmações via WhatsApp para o Scheduler.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "better-sqlite3": "^11.3.0",
+    "pino": "^9.4.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}

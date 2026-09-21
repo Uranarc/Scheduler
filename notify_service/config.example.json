@@ -1,0 +1,5 @@
+{
+  "groupId": "",
+  "reminderDaysBefore": [2],
+  "waitMsForRepliesMs": 25000
+}

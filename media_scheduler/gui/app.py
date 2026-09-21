@@ -1,7 +1,7 @@
 """Main Tk root window, top bar (with theme toggle), and notebook tab assembly."""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from media_scheduler.gui import theme
 from media_scheduler.gui.assignments_frame import AssignmentsFrame
@@ -9,6 +9,7 @@ from media_scheduler.gui.dashboard_frame import DashboardFrame
 from media_scheduler.gui.events_frame import EventsFrame
 from media_scheduler.gui.generate_frame import GenerateFrame
 from media_scheduler.gui.members_frame import MembersFrame
+from media_scheduler.sync.export_schedule import sync_and_push
 
 
 class App(tk.Tk):
@@ -37,6 +38,10 @@ class App(tk.Tk):
         )
         self.theme_btn.pack(side='right')
 
+        ttk.Button(
+            topbar, text='🔄 Sincronizar', command=self.sync_schedule,
+        ).pack(side='right', padx=(0, 8))
+
         body = ttk.Frame(self, padding=(16, 0, 16, 16))
         body.pack(fill='both', expand=True)
 
@@ -54,14 +59,21 @@ class App(tk.Tk):
             self.assignments_frame, self.dashboard_frame,
         ]
 
-        self.notebook.add(self.members_frame, text='  👥 Members  ')
-        self.notebook.add(self.events_frame, text='  🗓 Events  ')
-        self.notebook.add(self.generate_frame, text='  ⚙ Generate  ')
-        self.notebook.add(self.assignments_frame, text='  📋 Assignments  ')
-        self.notebook.add(self.dashboard_frame, text='  📊 Dashboard  ')
+        self.notebook.add(self.members_frame, text='  👥 Membros  ')
+        self.notebook.add(self.events_frame, text='  🗓 Eventos  ')
+        self.notebook.add(self.generate_frame, text='  ⚙ Gerar Escala  ')
+        self.notebook.add(self.assignments_frame, text='  📋 Atribuições  ')
+        self.notebook.add(self.dashboard_frame, text='  📊 Painel  ')
 
     def _theme_label(self):
-        return '☀  Claro' if self.mode == 'dark' else '🌙  Escuro'
+        return '☀️  Claro' if self.mode == 'dark' else '🌙  Escuro'
+
+    def sync_schedule(self):
+        try:
+            msg = sync_and_push()
+        except Exception as exc:
+            msg = f'Erro inesperado: {exc}'
+        messagebox.showinfo('Sincronizar', msg)
 
     def toggle_theme(self):
         self.mode = 'dark' if self.mode == 'light' else 'light'

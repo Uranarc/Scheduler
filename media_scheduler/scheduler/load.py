@@ -15,4 +15,4 @@ def compute_load_increment(zone: str, importance: int, stress_increase: float = 
     responsible for decay and capping (see config.LOAD_DECAY / config.LOAD_CAP).
     """
     zw = float(ZONE_WEIGHTS.get(zone, 1.0))
-    return float(stress_increase) * (1 + 0.3 * (float(importance) - 1)) * (1 + 0.2 * (zw - 1))
+    return round(float(stress_increase) * (1 + 0.3 * (float(importance) - 1)) * (1 + 0.2 * (zw - 1)), 2)

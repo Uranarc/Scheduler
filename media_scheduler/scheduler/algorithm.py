@@ -1,7 +1,7 @@
 """Core scheduling algorithm and helper functions for assignment generation."""
 
 import random
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from media_scheduler.config import (
     EVENT_REPEAT_PENALTY,
@@ -139,8 +139,8 @@ def generate_schedule_db(
 
     # normalize member fields
     for mid, m in member_map.items():
-        m['stress'] = float(m.get('stress', 0.0) or 0.0)
-        m['load_stress'] = float(m.get('load_stress', 0.0) or 0.0)
+        m['stress'] = round(float(m.get('stress', 0.0) or 0.0), 2)
+        m['load_stress'] = round(float(m.get('load_stress', 0.0) or 0.0), 2)
         m['coord_level'] = int(m.get('coord_level', 0) or 0)
 
     # Event dates within this generation range (for variety penalties)
@@ -186,7 +186,7 @@ def generate_schedule_db(
             mids = sorted(candidate_member_ids)
             placeholders = ','.join('?' for _ in mids)
             c.execute(
-                f'UPDATE members SET load_stress = load_stress * ? WHERE id IN ({placeholders})',
+                f'UPDATE members SET load_stress = ROUND(load_stress * ?, 2) WHERE id IN ({placeholders})',
                 (float(LOAD_DECAY), *mids)
             )
             conn.commit()
@@ -196,8 +196,8 @@ def generate_schedule_db(
         for r in rows:
             mid = r['id']
             if mid in member_map:
-                member_map[mid]['stress'] = float(r['stress'] or 0.0)
-                member_map[mid]['load_stress'] = float(r['load_stress'] or 0.0)
+                member_map[mid]['stress'] = round(float(r['stress'] or 0.0), 2)
+                member_map[mid]['load_stress'] = round(float(r['load_stress'] or 0.0), 2)
                 member_map[mid]['coord_level'] = int(r['coord_level'] or 0)
 
         # Preload served days from DB for the window (range)
@@ -300,7 +300,7 @@ def generate_schedule_db(
                     ON CONFLICT(event_id, zone) DO UPDATE SET
                         member_id = excluded.member_id,
                         assigned_at = excluded.assigned_at
-                ''', (ev['id'], zone, best, datetime.now(UTC).isoformat()))
+                ''', (ev['id'], zone, best, datetime.now(timezone.utc).isoformat()))
 
                 mname = member_map[best]['name']
                 assignments.append((ev['id'], ev['date'], ev['name'], zone, best, mname))
@@ -319,7 +319,7 @@ def generate_schedule_db(
                 # add dynamic load
                 load_inc = compute_load_increment(zone, ev['importance'], stress_increase)
                 current_load = float(member_map[best].get('load_stress', 0.0))
-                member_map[best]['load_stress'] = min(float(LOAD_CAP), current_load + load_inc)
+                member_map[best]['load_stress'] = round(min(float(LOAD_CAP), current_load + load_inc), 2)
 
                 recent_map.setdefault(best, []).append(ev_date)
 
@@ -332,14 +332,14 @@ def generate_schedule_db(
                     ON CONFLICT(event_id) DO UPDATE SET
                         member_id = excluded.member_id,
                         assigned_at = excluded.assigned_at
-                ''', (ev['id'], coord_mid, datetime.now(UTC).isoformat()))
+                ''', (ev['id'], coord_mid, datetime.now(timezone.utc).isoformat()))
                 coordinators[ev['id']] = member_map[coord_mid]['name']
 
         conn.commit()
 
         # persist load stress capped
         for mid in member_map.keys():
-            new_val = min(float(LOAD_CAP), float(member_map[mid].get('load_stress', 0.0)))
+            new_val = round(min(float(LOAD_CAP), float(member_map[mid].get('load_stress', 0.0))), 2)
             member_map[mid]['load_stress'] = new_val
             c.execute('UPDATE members SET load_stress = ? WHERE id = ?', (new_val, mid))
 
@@ -347,10 +347,13 @@ def generate_schedule_db(
 
     final_stresses = {
         mid: {
-            "manual": float(member_map[mid].get('stress', 0.0)),
-            "load": float(member_map[mid].get('load_stress', 0.0)),
-            "total": (MANUAL_STRESS_WEIGHT * float(member_map[mid].get('stress', 0.0))) +
-                     (LOAD_STRESS_WEIGHT * float(member_map[mid].get('load_stress', 0.0))),
+            "manual": round(float(member_map[mid].get('stress', 0.0)), 2),
+            "load": round(float(member_map[mid].get('load_stress', 0.0)), 2),
+            "total": round(
+                (MANUAL_STRESS_WEIGHT * float(member_map[mid].get('stress', 0.0)))
+                + (LOAD_STRESS_WEIGHT * float(member_map[mid].get('load_stress', 0.0))),
+                2
+            ),
         }
         for mid in member_map.keys()
     }
